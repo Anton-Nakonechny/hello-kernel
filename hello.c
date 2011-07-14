@@ -7,6 +7,8 @@
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
 #include <asm/uaccess.h>
+#include <linux/semaphore.h>
+#include "hello.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -54,7 +56,7 @@ static int timeout = MY_TICK;
 module_param (recipient, charp, S_IRUGO);
 module_param (do_bug, int, S_IRUGO);
 
-struct context * my_context = NULL;
+static struct context * my_context = NULL;
 
 #define proc_bye(label) do \
 	{\
@@ -65,9 +67,16 @@ struct context * my_context = NULL;
 int try_arm_timer(struct timer_list * timer_ptr, 
 		spinlock_t * timer_lock, 
 		char * name, 
-		unsigned long * counter)
+		unsigned long * counter,
+		int try_sema)
 {
 	int atempted = 0;
+	
+	if(try_sema)
+	{
+		down_interruptible(&(my_context->semaphore));
+	}
+
 	spin_lock_bh(timer_lock);
 	if (atempted = ! time_after(timer_ptr->expires, jiffies))
 	{
@@ -75,14 +84,21 @@ int try_arm_timer(struct timer_list * timer_ptr,
 		(*counter)++;
 	}
 	spin_unlock_bh(timer_lock);
+
+	if(try_sema)
+	{
+		up(&(my_context->semaphore));
+	}
+
 	if(atempted)
 		printk(KERN_INFO "Expires at %lu; jiffies %lu ; %s is winner\n", timer_ptr->expires, jiffies, name);
+	
 	return atempted;
 }
 
 static void my_precious_workqueue_handler(struct work_struct *work)
 {
-	try_arm_timer(&(context->timer),&my_precious_timer_lock,"workqueue", &workqueue_counter);
+	try_arm_timer(&(my_context->timer),&(my_context->timer_lock),"workqueue", &(my_context->workqueue_counter), 1);
 }
 
 static int my_precious_kthread(void * data)
@@ -91,10 +107,10 @@ static int my_precious_kthread(void * data)
 	{
 		if (kthread_should_stop())
 			break;
-		if(should_update_timer)
+		if(my_context->should_update_timer)
 		{
-			try_arm_timer(&(context->timer),&my_precious_timer_lock,"kthread", &kthread_counter);
-			should_update_timer = 0;
+			try_arm_timer(&(my_context->timer),&(my_context->timer_lock),"kthread", &(my_context->kthread_counter), 1);
+			my_context->should_update_timer = 0;
 		}
 		set_current_state (TASK_INTERRUPTIBLE);
 /*schedule_timeout_interruptible (HZ / 2);*/
@@ -105,22 +121,22 @@ static int my_precious_kthread(void * data)
 
 static void my_precious_tasklet_handler(unsigned long data)
 {
-	try_arm_timer(&(context->timer),&my_precious_timer_lock,"tasklet", &tasklet_counter);
+	try_arm_timer(&(my_context->timer),&(my_context->timer_lock),"tasklet", &(my_context->tasklet_counter), 0);
 }
 
 static void my_precious_timer_handler(unsigned long data)
 {
-	printk(KERN_ALERT "Hello-timer expired! Counter is %lu\n", timer_counter++);
-	schedule_work(&(context->work));
-	tasklet_schedule(&my_context->);
+	printk(KERN_ALERT "Hello-timer expired! Counter is %lu\n", (my_context->timer_counter)++);
+//	tasklet_schedule(&(my_context->tasklet));
 	my_context->should_update_timer = 1;
 	mb();
-	wake_up_process(&(context->task));
+	wake_up_process(my_context->task);
+	schedule_work(&(my_context->work));
 }
 
 static int hello_init(void)
 {
-	if (! my_context = kmalloc(sizeof(struct context), GFP_KERNEL))
+	if (!( my_context = kmalloc(sizeof(struct context), GFP_KERNEL)))
 	{
 		printk(KERN_ALERT "Couldn't allocate memmory in hello driver.");
 		goto err;
@@ -128,7 +144,7 @@ static int hello_init(void)
 
 	memset(my_context, 0, sizeof(struct context));
 	my_context->timer_lock = SPIN_LOCK_UNLOCKED;
-
+	sema_init(&(my_context->semaphore), 1);
 
 #ifdef CONFIG_PROC_FS
 	if (!(proc_root_dir = proc_mkdir(PROC_DIR_NAME, NULL)))
@@ -159,13 +175,17 @@ static int hello_init(void)
 
 #endif
 	
-	init_timer(&(context->timer));
-	INIT_WORK (&(context->work),my_precious_workqueue_handler);
+	init_timer(&(my_context->timer));
+	
+	INIT_WORK (&(my_context->work),my_precious_workqueue_handler);
+	
 	my_context->task = kthread_create(my_precious_kthread, NULL, PROC_KTHREAD_NAME); 
 	
-	(context->timer).data = 0;
-	(context->timer).function = my_precious_timer_handler;
-	mod_timer(&(context->timer), jiffies + HZ * MY_TICK);
+	tasklet_init(&(my_context->tasklet), my_precious_tasklet_handler, 0x0);
+
+	(my_context->timer).data = 0x0;
+	(my_context->timer).function = my_precious_timer_handler;
+	mod_timer(&(my_context->timer), jiffies + HZ * MY_TICK);
 	
 	printk(KERN_INFO "Hello, %s!\n", recipient);
 	return 0;
@@ -208,13 +228,16 @@ static void hello_exit(void)
 		remove_proc_entry(PROC_DIR_NAME, NULL);
 #endif
 	
-	cancel_work_sync(&(context->work));
-	tasklet_disable (&my_precious_tasklet);
-	del_timer_sync (&(context->timer));
-	if(my_precious_task)
-		kthread_stop (my_precious_task);
+	cancel_work_sync(&(my_context->work));
+
+
+	tasklet_kill (&(my_context->tasklet));
+	
+	del_timer_sync (&(my_context->timer));
+	if(my_context->task)
+		kthread_stop (my_context->task);
 	printk(KERN_ALERT "Goodbye, cruel %s!\n", recipient);
-	kfree(context);
+	kfree(my_context);
 }
 
 #ifdef CONFIG_PROC_FS
