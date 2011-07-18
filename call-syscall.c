@@ -15,5 +15,5 @@ long mysyscall(int i)
 
 int main(void)
 {
-	printf("15+10 = %i", mysyscall(15));
+	printf("15+10 = %li\n", mysyscall(15));
 }
