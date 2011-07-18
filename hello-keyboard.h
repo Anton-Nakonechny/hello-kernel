@@ -10,4 +10,7 @@ struct context
 	char registered;
 };
 
+#define MY_IRQ_LINE 17
+#define MY_MAGIC_ID 12345
+
 #endif //__HELLO_H
