@@ -1,0 +1,60 @@
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//arch/x86/kernel/syscall_table_32.S ./arch/x86/kernel/syscall_table_32.S
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//arch/x86/kernel/syscall_table_32.S	2011-03-15 03:20:32.000000000 +0200
++++ ./arch/x86/kernel/syscall_table_32.S	2011-07-18 21:53:06.000000000 +0300
+@@ -340,3 +340,4 @@ ENTRY(sys_call_table)
+ 	.long sys_fanotify_init
+ 	.long sys_fanotify_mark
+ 	.long sys_prlimit64		/* 340 */
++	.long sys_mysyscall
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//include/asm-generic/unistd.h ./include/asm-generic/unistd.h
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//include/asm-generic/unistd.h	2011-03-15 03:20:32.000000000 +0200
++++ ./include/asm-generic/unistd.h	2011-07-18 21:52:46.000000000 +0300
+@@ -646,9 +646,11 @@ __SYSCALL(__NR_prlimit64, sys_prlimit64)
+ __SYSCALL(__NR_fanotify_init, sys_fanotify_init)
+ #define __NR_fanotify_mark 263
+ __SYSCALL(__NR_fanotify_mark, sys_fanotify_mark)
++#define __NR_mysyscall 341
++__SYSCALL(__NR_getirq, sys_getirq)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 264
++#define __NR_syscalls 342
+ 
+ /*
+  * All syscalls below here should go away really,
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//include/linux/syscalls.h ./include/linux/syscalls.h
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//include/linux/syscalls.h	2011-03-15 03:20:32.000000000 +0200
++++ ./include/linux/syscalls.h	2011-07-18 21:52:47.000000000 +0300
+@@ -832,5 +832,5 @@ asmlinkage long sys_mmap_pgoff(unsigned
+ 			unsigned long prot, unsigned long flags,
+ 			unsigned long fd, unsigned long pgoff);
+ asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
+-
++asmlinkage long sys_mysyscall(int i);
+ #endif
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//Makefile ./Makefile
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//Makefile	2011-07-18 21:11:02.000000000 +0300
++++ ./Makefile	2011-07-18 21:51:42.000000000 +0300
+@@ -491,6 +491,7 @@ drivers-y	:= drivers/ sound/ firmware/
+ net-y		:= net/
+ libs-y		:= lib/
+ core-y		:= usr/
++core-y		+= mysyscall/
+ endif # KBUILD_EXTMOD
+ 
+ ifeq ($(dot-config),1)
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//mysyscall/Makefile ./mysyscall/Makefile
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//mysyscall/Makefile	1970-01-01 03:00:00.000000000 +0300
++++ ./mysyscall/Makefile	2011-07-18 21:52:50.000000000 +0300
+@@ -0,0 +1 @@
++obj-y += mysyscall.o
+diff -pruNa /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//mysyscall/mysyscall.c ./mysyscall/mysyscall.c
+--- /var/tmp/portage/sys-kernel/gentoo-sources-2.6.38-r6/image/usr/src/linux-2.6.38-gentoo-r6//mysyscall/mysyscall.c	1970-01-01 03:00:00.000000000 +0300
++++ ./mysyscall/mysyscall.c	2011-07-18 22:04:40.000000000 +0300
+@@ -0,0 +1,6 @@
++#include <linux/linkage.h>
++
++asmlinkage long sys_mysyscall(int i)
++{
++	return (long) i+10;
++}
