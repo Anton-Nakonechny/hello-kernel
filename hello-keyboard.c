@@ -61,10 +61,6 @@ irqreturn_t hard_handler(int irq, void *dev_id)
 		return IRQ_NONE;
 }
 
-SYSCALL_DEFINE0 (getirq)
-{
-	return my_context->irq_counter;
-}
 
 static void my_precious_tasklet_handler(unsigned long data)
 {
@@ -168,3 +164,4 @@ int read_proc_int(char *buf, char **start, off_t offset, int count, int *eof, vo
 module_init(hello_init);
 module_exit(hello_exit);
 
+//SYSCALL_DEFINE0(mysyscall);
