@@ -41,7 +41,7 @@ static int irq_num = 0;
 
 module_param (irq_num, int, S_IRUGO);
 
-static int dev_id = MY_MAGIC_ID;
+//static int dev_id = MY_MAGIC_ID;
 static struct context * my_context = NULL;
 
 #define proc_bye(label) do \
@@ -52,7 +52,7 @@ static struct context * my_context = NULL;
 
 irqreturn_t hard_handler(int irq, void *dev_id)
 {
-	if(*((int *)dev_id) == MY_MAGIC_ID)
+	if (dev_id == my_context)
 	{	
 		tasklet_schedule(&(my_context->tasklet));
 		return IRQ_HANDLED;
@@ -66,6 +66,7 @@ static void my_precious_tasklet_handler(unsigned long data)
 {
 	if (printk_ratelimit())
 		printk(KERN_NOTICE "You can't hide yourself! Counter is %lu\n",++(my_context->irq_counter));
+	(my_context->tasklet_counter)++;
 }
 
 static int hello_init(void)
@@ -103,7 +104,7 @@ static int hello_init(void)
 	
 	tasklet_init(&(my_context->tasklet), my_precious_tasklet_handler, 0x0);
 	
-	if (register_result = request_irq(irq_num, hard_handler, IRQF_SHARED, name, &dev_id)) 
+	if (register_result = request_irq(irq_num, hard_handler, IRQF_SHARED, name, my_context)) 
 	{
 		printk(KERN_ERR "Couldn't register ! res = %i EBUSY=%i", register_result, EBUSY);
 		my_context->registered = 0;
@@ -144,7 +145,7 @@ static void hello_exit(void)
 	
 	printk(KERN_ALERT "Goodbye, cruel %s!\n", recipient);
 	if(my_context->registered)
-		free_irq (irq_num, &dev_id);	
+		free_irq (irq_num, my_context);	
 
 	kfree(my_context);
 }
