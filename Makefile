@@ -10,6 +10,7 @@ else
 default:
 		$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 clean:
+		rm -f call-syscall
 		$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
 
 call-syscall: % : %.c
