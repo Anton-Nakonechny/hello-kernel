@@ -4,7 +4,7 @@
 #include <linux/kernel.h>
 #include <stdlib.h>
 
-//#define __NR_mysyscall 341
+#define __NR_mysyscall 341
 
 //__syscall1(long, mysyscall, int, i);
 
